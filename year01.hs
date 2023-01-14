@@ -1,13 +1,35 @@
+{-
+Year.hs
+Haskell program to generate equations for the numbers 1 to 100 using the digits of the year
+See https://gibhub.com/alfille/Year_digits
+
+by Paul H Alfille 2023
+MIT License
+
+-}
+
+-- for permutation
 import Data.List
 
+-- | uniq eliminates duplicates in a list
+uniq :: Eq a => [a] -> [a]
+-- ^
 uniq [] = []
 uniq (x:xs)
     | elem x xs = rest
     | otherwise = x:rest
     where rest = uniq xs
 
+
+-- | splode separates list into list of lists -- e.g. "2023" into ["2","0","2","3"]
+splode :: [a] -> [[a]]
+--^
 splode x = [ [l] | l <- x ]
 
+-- | cperm (aka character permute) creates a list of all possible concatination of letters in order
+-- e.g. cperm $ splode "12" = [["1","2"],["12"]]
+cperm :: [[a]] -> [[[a]]]
+-- ^
 cperm x = case (length x) of
     0 -> [[]]
     1 -> [x]
@@ -16,42 +38,46 @@ cperm x = case (length x) of
     where (x1:x2:xs) = x
           x3 = x1++x2
 
--- only in order
-shortlist :: String -> [[String]]
-shortlist x = cperm $ splode x 
+-- | orderList generates the cpermutations of the year's digits in order
+orderList :: String -> [[String]]
+-- ^
+orderList x = cperm $ splode x 
 
--- any order
-longlist :: String -> [[String]]
-longlist x = foldl1 (++) $ map cperm $ uniq $ permutations $ splode x 
+-- | orderList generates the cpermutations of the year's digits in any order
+unorderList :: String -> [[String]]
+-- ^
+unorderList x = foldl1 (++) $ map cperm $ uniq $ permutations $ splode x 
 
+-- | Operation type holds information on unitary and binary operations
 data Operation =
         UnaryOp String (Integer -> Maybe Integer) |
         BinaryOp String (Integer -> Integer -> Maybe Integer)
+-- ^
 
-
+{-
+-- factorial optional 
 factorial n
     | n<2 = 1
     | otherwise = n * factorial (n-1)
+-}
 
--- replace only first occurrence of '_' with v
+-- | sub_str substitute a string for an underscore -- used in explaining an equation
+-- replace only first occurrence of '_' with variable
+sub_str :: [a] -> [a] -> [a] -- used as String -> String -> String
+-- ^
 sub_str [] _ = []
 sub_str ('_':xs) v = v++xs
 sub_str (x:xs) v = (x:(sub_str xs v))
     
-sub_op ( UnaryOp n f ) (v:vs) = sub_str n v
-sub_op ( BinaryOp n f ) (v:w:vs) = sub_str (sub_str n v) w
-
-divvy_up x = case len of
-    0 -> [[]]
-    1 -> [[x]]
-    _ -> [ [fst u, snd u] | u <- [ splitAt n x | n <- [ 1 .. (len-1) ] ] ]
-    where len = length x
-
+-- | Expression type holds intermediate and final equation information
+-- includes value and String explaining calculation to date
+-- Also has Invalid type for redundant expressions or divide-by-zero
 data Expression =
             Invalid String | -- String is explanation
             Single Integer String | -- equation and result of calculation
             Pair Expression Expression  -- pair of expressions ready for binary operation
             deriving(Show)
+-- ^
 
 -- Creates all possible pairs of a list (for binary operators)
 -- i.e. [a,b,c] -> (a,(b,c) + ((a,b),c)
@@ -116,8 +142,8 @@ total_calc es = foldr1 (++) [ binary_multicalc e | e <- es ]
 
 -- literal number -> digits -> (-> optional permutations) -> combinations of digits -> All binary pairs in an Expression
 -- returns [Expression]
-shortpair_up x = foldl1 (++) $ fmap pair_up $ shortlist x
-longpair_up  x = foldl1 (++) $ fmap pair_up $ longlist  x
+shortpair_up x = foldl1 (++) $ fmap pair_up $ orderList x
+longpair_up  x = foldl1 (++) $ fmap pair_up $ unorderList  x
 
 -- filter for solutions to restring to 1 .. 100
 goodcalc (Invalid _) = False
