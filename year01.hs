@@ -79,9 +79,11 @@ data Expression =
             deriving(Show)
 -- ^
 
--- Creates all possible pairs of a list (for binary operators)
+-- | pair_up creates all possible pairs of a list (for binary operators)
 -- i.e. [a,b,c] -> (a,(b,c) + ((a,b),c)
+-- results wrapped up in Expression types
 pair_up :: [String] -> [Expression]
+-- ^
 pair_up xs = case len of
     0 -> [Invalid "No input"]
     1 -> [Single (read x1::Integer) x1 ] -- Also interpret literal to numeric
@@ -89,19 +91,22 @@ pair_up xs = case len of
     where len = length xs
           (x1:xx) = xs 
 
-op1List = [
+-- | operator lists, unary and binary
+-- minus removed since x-y == x+(-y) so would be double counted
+-- Exponentiation 
+unaryList = [
     UnaryOp "_" (\x->Just (x) )
     ,UnaryOp "(-_)" (\x->Just (-x) )
 --    ,UnaryOp "_!" (\x-> if (x<0) || (x>10) then Nothing else Just (factorial x) )
     ]
 
-op2List = [
+binaryList = [
     BinaryOp "(_+_)" (\x y->Just (x+y) )
 --    ,BinaryOp "(_-_)" (\x y->if y<0 then Nothing else Just (x-y) )
     ,BinaryOp "(_*_)" (\x y->Just (x*y) )
     ,BinaryOp "(_/_)" (\x y->if (y==0) || ((mod x y)==0) then Nothing else Just (div x y) )
-    ,BinaryOp "(_^_)" (\x y->if y<=0 then Nothing else Just (x^y) )
-    ,BinaryOp "(_ mod _)" (\x y->if (y<1) then Nothing else Just (mod x y) )
+    ,BinaryOp "(_^_)" (\x y->if (y<=0) || (x<0) then Nothing else Just (x^y) )
+--    ,BinaryOp "(_ mod _)" (\x y->if (y<1) then Nothing else Just (mod x y) )
     ]
 
 -- Single and op to calculated Single
@@ -125,7 +130,7 @@ binary_calc (Single i1 s1) (Single i2 s2) (BinaryOp s f) = case c of
 
 unary_multicalc :: Expression -> [Expression]
 unary_multicalc (Invalid s) = [Invalid s]
-unary_multicalc sing = [ unary_calc sing op | op <- op1List ] 
+unary_multicalc sing = [ unary_calc sing op | op <- unaryList ] 
 
 binary_multicalc :: Expression -> [Expression]
 binary_multicalc (Invalid s) = [Invalid s]
@@ -134,8 +139,8 @@ binary_multicalc (Pair p1 p2) = [
             unary_calc (binary_calc pp1 pp2 o2) o1 |
                 pp1 <- (binary_multicalc p1),
                 pp2 <- (binary_multicalc p2),
-                o2 <- op2List,
-                o1 <- op1List ]  
+                o2 <- binaryList,
+                o1 <- unaryList ]  
 
 total_calc :: [Expression] -> [Expression]
 total_calc es = foldr1 (++) [ binary_multicalc e | e <- es ]
