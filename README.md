@@ -12,12 +12,17 @@ Example:
 
 etc...
 
+# Project
+Written 2023 Paul H Alfille
+paul.alfille@gmail.com
+
+MIT License
+
 # Inspiration
 This problem appears as a yearly proposal in [MIT's Technology Review](https://www.technologyreview.com/2004/03/01/40269/puzzle-corner-12/)
 
-```
-Y2004. How many integers from 1 to 100 can you form using the digits 2, 0, 0, and 4 exactly once each and the operators +, -, x (multiplication), / (division), and exponentiation? We desire solutions containing the minimum number of operators; and among solutions having a given number of operators, those using the digits in the order 2, 0, 0, and 4 are preferred. Parentheses may be used for grouping; they do not count as operators. A leading minus sign does count as an operator.
-```
+>Y2004. How many integers from 1 to 100 can you form using the digits 2, 0, 0, and 4 exactly once each and the operators +, -, x (multiplication), / (division), and exponentiation? We desire solutions containing the minimum number of operators; and among solutions having a given number of operators, those using the digits in the order 2, 0, 0, and 4 are preferred. Parentheses may be used for grouping; they do not count as operators. A leading minus sign does count as an operator.
+
 # Project
 ## Format
 Our approach will be an exhaustive search of the possible equations. Some versions with progressive optimizations will be added.
