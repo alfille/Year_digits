@@ -23,7 +23,7 @@ uniq (x:xs)
 
 -- | splode separates list into list of lists -- e.g. "2023" into ["2","0","2","3"]
 splode :: [a] -> [[a]]
---^
+-- ^
 splode x = [ [l] | l <- x ]
 
 -- | cperm (aka character permute) creates a list of all possible concatination of letters in order
@@ -63,7 +63,7 @@ factorial n
 
 -- | sub_str substitute a string for an underscore -- used in explaining an equation
 -- replace only first occurrence of '_' with variable
-sub_str :: [a] -> [a] -> [a] -- used as String -> String -> String
+sub_str :: String -> String -> String -- used as String -> String -> String
 -- ^
 sub_str [] _ = []
 sub_str ('_':xs) v = v++xs
@@ -104,22 +104,25 @@ binaryList = [
     BinaryOp "(_+_)" (\x y->Just (x+y) )
 --    ,BinaryOp "(_-_)" (\x y->if y<0 then Nothing else Just (x-y) )
     ,BinaryOp "(_*_)" (\x y->Just (x*y) )
-    ,BinaryOp "(_/_)" (\x y->if (y==0) || ((mod x y)==0) then Nothing else Just (div x y) )
+    ,BinaryOp "(_/_)" (\x y->if (y==0) || ((mod x y)/=0) then Nothing else Just (div x y) )
     ,BinaryOp "(_^_)" (\x y->if (y<=0) || (x<0) then Nothing else Just (x^y) )
 --    ,BinaryOp "(_ mod _)" (\x y->if (y<1) then Nothing else Just (mod x y) )
     ]
 
+-- | unary_calc apply unitary operator
 -- Single and op to calculated Single
 unary_calc :: Expression -> Operation -> Expression
+-- ^
 unary_calc (Invalid s) _ = Invalid s
 unary_calc (Single i1 s1) (UnaryOp s f) = case c of
     Nothing -> Invalid sout
     Just(i) -> Single i sout 
     where sout = sub_str s s1
           c =  f i1
-
+-- | binary_calc apply an operation to a pair of values
 -- Two Singletons and Op to calculated Single
 binary_calc :: Expression -> Expression -> Operation -> Expression
+-- ^
 binary_calc (Invalid s) _ _ = Invalid s
 binary_calc _ (Invalid s) _ = Invalid s
 binary_calc (Single i1 s1) (Single i2 s2) (BinaryOp s f) = case c of
@@ -128,11 +131,15 @@ binary_calc (Single i1 s1) (Single i2 s2) (BinaryOp s f) = case c of
     where sout = sub_str (sub_str s s1) s2
           c =  f i1 i2
 
+-- | unary_multicalc Apply all unitary ops
 unary_multicalc :: Expression -> [Expression]
+-- ^
 unary_multicalc (Invalid s) = [Invalid s]
 unary_multicalc sing = [ unary_calc sing op | op <- unaryList ] 
 
+-- binary_multicalc Apply binary opps (recursively)
 binary_multicalc :: Expression -> [Expression]
+-- ^
 binary_multicalc (Invalid s) = [Invalid s]
 binary_multicalc p@(Single i s) = unary_multicalc p
 binary_multicalc (Pair p1 p2) = [
@@ -142,13 +149,15 @@ binary_multicalc (Pair p1 p2) = [
                 o2 <- binaryList,
                 o1 <- unaryList ]  
 
+-- | total_calc apply calc to a list of expressions
 total_calc :: [Expression] -> [Expression]
+-- ^
 total_calc es = foldr1 (++) [ binary_multicalc e | e <- es ]
 
 -- literal number -> digits -> (-> optional permutations) -> combinations of digits -> All binary pairs in an Expression
 -- returns [Expression]
-shortpair_up x = foldl1 (++) $ fmap pair_up $ orderList x
-longpair_up  x = foldl1 (++) $ fmap pair_up $ unorderList  x
+orderedPairs x = foldl1 (++) $ fmap pair_up $ orderList x
+unorderedPairs  x = foldl1 (++) $ fmap pair_up $ unorderList  x
 
 -- filter for solutions to restring to 1 .. 100
 goodcalc (Invalid _) = False
@@ -158,7 +167,11 @@ goodcalc (Single i _) = (i>0) && (i<101)
 compareSingle (Single i1 s1) (Single i2 s2)
     | i1 < i2 = LT
     | i1 > i2 = GT
-    | otherwise = compare (length s1) (length s2)
+    | otherwise = compare (opcount s1) (opcount s2)
+    where opcount [] = 0
+          opcount (x:xs)
+            | elem x "+/*^" = 1 + (opcount xs )
+            | otherwise = opcount xs
 
 bestcalc :: [Expression] -> [Expression]
 -- take only first value from the sorted list
