@@ -8,6 +8,8 @@ MIT License
 
 -}
 
+module Year where
+
 -- for permutation
 import Data.List
 
@@ -199,11 +201,38 @@ eparse x = split_chars "*()-+/^" $ filter (' '/=) x
 simplify [] = []
 simplify ("+":"-":ds) = ("-":(simplify ds))
 simplify ("(":b:")":ds) = (b:(simplify ds))
+simplify ("(":"-":b:")":ds) = ("-":b:(simplify ds))
 simplify (x:xs) = x:(simplify xs)
 
-simple x
+resimple x
     | (length x) == (length sx) = x
-    | otherwise = simple sx
+    | otherwise = resimple sx
     where sx = simplify x
 
+simple x = resimple x
+
+-- | Year Digits problem -- make as many of the numbers between 1 and 100 using the digits of the current year
 -- solve the problem
+main :: IO ()
+-- ^
+main = do
+  putStrLn "Enter the year:"
+  year <- getLine
+
+  putStrLn "Ordered solution:"
+  let solution1 = bestcalc
+                 $ sortBy compareSingle
+                 $ filter goodcalc
+                 $ total_calc
+                 $ orderedPairs year 
+  mapM_ putStrLn $ map show solution1
+  mapM_ putStrLn $ [ concat $ simple $ eparse $ literal s | s <- solution1 ]
+
+  putStrLn "Unordered solution:"
+  let solution2 = bestcalc
+                 $ sortBy compareSingle
+                 $ filter goodcalc
+                 $ total_calc
+                 $ unorderedPairs year 
+  mapM_ putStrLn $ map show solution2
+  mapM_ putStrLn $ [ concat $ simple $ eparse $ literal s | s <- solution2 ]
