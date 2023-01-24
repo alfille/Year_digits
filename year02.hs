@@ -74,7 +74,10 @@ sub_str (x:xs) v = (x:(sub_str xs v))
 -- Also has Invalid type for redundant expressions or divide-by-zero
 data Expression =
             Invalid String | -- String is explanation
-            Single Integer String | -- equation and result of calculation
+            Single { value :: Integer
+            , operators :: Integer
+            , literal :: String
+            }| -- equation and result of calculation: value, ops, equation_text
             Pair Expression Expression  -- pair of expressions ready for binary operation
             deriving(Show)
 -- ^
@@ -86,7 +89,7 @@ pair_up :: [String] -> [Expression]
 -- ^
 pair_up xs = case len of
     0 -> [Invalid "No input"]
-    1 -> [Single (read x1::Integer) x1 ] -- Also interpret literal to numeric
+    1 -> [Single {value=(read x1::Integer), operators=0, literal=x1} ] -- Also interpret literal to numeric
     _ -> [Pair f s | w<-[ (pair_up $ fst u, pair_up $ snd u) | u <- [ splitAt n xs | n <- [ 1 .. (len-1) ] ] ], f<-fst w, s <-snd w]
     where len = length xs
           (x1:xx) = xs 
@@ -114,9 +117,9 @@ binaryList = [
 unary_calc :: Expression -> Operation -> Expression
 -- ^
 unary_calc (Invalid s) _ = Invalid s
-unary_calc (Single i1 s1) (UnaryOp s f) = case c of
+unary_calc single@(Single {value=i1, operators=o1, literal=s1}) (UnaryOp s f) = case c of
     Nothing -> Invalid sout
-    Just(i) -> Single i sout 
+    Just(i) -> single { value=i, literal=sout} 
     where sout = sub_str s s1
           c =  f i1
 -- | binary_calc apply an operation to a pair of values
@@ -125,9 +128,9 @@ binary_calc :: Expression -> Expression -> Operation -> Expression
 -- ^
 binary_calc (Invalid s) _ _ = Invalid s
 binary_calc _ (Invalid s) _ = Invalid s
-binary_calc (Single i1 s1) (Single i2 s2) (BinaryOp s f) = case c of
+binary_calc (Single {value=i1, operators=o1, literal=s1}) (Single {value=i2, operators=o2, literal=s2}) (BinaryOp s f) = case c of
     Nothing -> Invalid sout
-    Just(i) -> Single i sout
+    Just(i) -> Single { value=i, operators=o1+o2+1, literal=sout}
     where sout = sub_str (sub_str s s1) s2
           c =  f i1 i2
 
@@ -141,42 +144,66 @@ unary_multicalc sing = [ unary_calc sing op | op <- unaryList ]
 binary_multicalc :: Expression -> [Expression]
 -- ^
 binary_multicalc (Invalid s) = [Invalid s]
-binary_multicalc p@(Single i s) = unary_multicalc p
 binary_multicalc (Pair p1 p2) = [
             unary_calc (binary_calc pp1 pp2 o2) o1 |
                 pp1 <- (binary_multicalc p1),
                 pp2 <- (binary_multicalc p2),
                 o2 <- binaryList,
                 o1 <- unaryList ]  
+binary_multicalc s = unary_multicalc s -- Single implied
 
 -- | total_calc apply calc to a list of expressions
 total_calc :: [Expression] -> [Expression]
 -- ^
 total_calc es = foldr1 (++) [ binary_multicalc e | e <- es ]
 
+-- | orderedPairs and unorderedPairs -- create the list of possible equations from a year 
 -- literal number -> digits -> (-> optional permutations) -> combinations of digits -> All binary pairs in an Expression
--- returns [Expression]
-orderedPairs x = foldl1 (++) $ fmap pair_up $ orderList x
-unorderedPairs  x = foldl1 (++) $ fmap pair_up $ unorderList  x
+orderedPairs :: String -> [Expression]
+unorderedPairs :: String -> [Expression]
+-- ^
+orderedPairs x = foldr1 (++) $ fmap pair_up $ orderList x
+unorderedPairs  x = foldr1 (++) $ fmap pair_up $ unorderList  x
 
+-- | goodcalc for filtering list of expressions and removing inappropriate ones
 -- filter for solutions to restring to 1 .. 100
+goodcalc :: Expression -> Bool
+-- ^
 goodcalc (Invalid _) = False
-goodcalc (Single i _) = (i>0) && (i<101)
+goodcalc (Single {value=i}) = (i>0) && (i<101)
 
+-- | compare single for sorting solved expressions
 -- sorting comparison value, then string length
-compareSingle (Single i1 s1) (Single i2 s2)
-    | i1 < i2 = LT
-    | i1 > i2 = GT
-    | otherwise = compare (opcount s1) (opcount s2)
-    where opcount [] = 0
-          opcount (x:xs)
-            | elem x "+/*^" = 1 + (opcount xs )
-            | otherwise = opcount xs
+compareSingle :: Expression -> Expression -> Ordering
+-- ^
+compareSingle (Single {value=i1, operators=o1}) (Single {value=i2, operators=o2}) = compare (i1,o2) (i2,o2)
 
 bestcalc :: [Expression] -> [Expression]
 -- take only first value from the sorted list
 bestcalc [] = []
 bestcalc [e] = [e]
-bestcalc e@(e1@(Single i1 _):e2@(Single i2 _):es)
+bestcalc e@(e1@(Single {value=i1}):e2@(Single {value=i2}):es)
     | i1==i2 = bestcalc (e1:es)
     | otherwise = (e1:(bestcalc (e2:es)))
+
+split_chars _ [] = []
+split_chars c x
+    | b == "" = [a]
+    | a == "" = [[b']] ++ (split_chars c bs)
+    | otherwise = [a,[b']] ++ (split_chars c bs) 
+    where (a,b) = break (\q->elem q c) x
+          (b':bs) = b
+
+eparse x = split_chars "*()-+/^" $ filter (' '/=) x
+
+simplify [] = []
+simplify ("+":"-":ds) = ("-":(simplify ds))
+simplify ("(":b:")":ds) = (b:(simplify ds))
+simplify (x:xs) = x:(simplify xs)
+
+simple x
+    | (length x) == (length sx) = x
+    | otherwise = simple sx
+    where sx = simplify x
+
+-- solve the problem
