@@ -30,15 +30,22 @@ splode x = [ [l] | l <- x ]
 
 -- | cperm (aka character permute) creates a list of all possible concatination of letters in order
 -- e.g. cperm $ splode "12" = [["1","2"],["12"]]
-cperm :: [[a]] -> [[[a]]]
+cperm' :: [[a]] -> [[[a]]]
 -- ^
-cperm x = case (length x) of
+cperm' x = case (length x) of
     0 -> [[]]
     1 -> [x]
     2 -> [[x1,x2],[x3]]
-    _ -> cperm (x3:xs) ++ ( map ([x1]++) $ cperm (x2:xs) )
+    _ -> cperm' (x3:xs) ++ ( map ([x1]++) $ cperm' (x2:xs) )
     where (x1:x2:xs) = x
           x3 = x1++x2
+
+-- filter out leading zeros
+nolead0 "0" = True
+nolead0 ('0':xs) = False
+nolead0 _ = True
+
+cperm xs = filter (\x -> all nolead0 x) $ cperm' xs
 
 -- | orderList generates the cpermutations of the year's digits in order
 orderList :: String -> [[String]]
@@ -52,8 +59,8 @@ unorderList x = foldl1 (++) $ map cperm $ uniq $ permutations $ splode x
 
 -- | Operation type holds information on unitary and binary operations
 data Operation =
-        UnaryOp String (Integer -> Maybe Integer) |
-        BinaryOp String (Integer -> Integer -> Maybe Integer)
+        UnaryOp (Equation->Equation) (Int -> Maybe Int) |
+        BinaryOp (Equation->Equation->Equation) (Int -> Int -> Maybe Int)
 -- ^
 
 {-
@@ -63,22 +70,81 @@ factorial n
     | otherwise = n * factorial (n-1)
 -}
 
--- | sub_str substitute a string for an underscore -- used in explaining an equation
--- replace only first occurrence of '_' with variable
-sub_str :: String -> String -> String -- used as String -> String -> String
+-- | Equation holds the calculation in a form easy to display
 -- ^
-sub_str [] _ = []
-sub_str ('_':xs) v = v++xs
-sub_str (x:xs) v = (x:(sub_str xs v))
-    
+data Equation =
+        EqNull
+        | EqTerm Int
+        | EqSum [Equation]
+        | EqProduct [Equation]
+        | EqDiv { numerator :: Equation, denominator :: Equation }
+        | EqExp { base :: Equation, power :: Equation }
+        | EqNexp { base :: Equation, power :: Equation }
+        deriving(Show)
+
+eqShow :: Equation -> String
+eqShow (EqTerm i) = show i
+eqShow (EqNexp{ base=b, power=p}) = "-" ++ (eqShow ( EqExp{ base=b, power=p} )) 
+eqShow (EqExp{ base=b, power=p}) = (eqSubShow b) ++ "^" ++ (eqSubShow p) 
+eqShow (EqDiv{ numerator=n, denominator=d}) = ( eqSubShow n ) ++ "/" ++ ( eqSubShow d ) 
+eqShow (EqProduct es) = intercalate "*" [eqSubShow e | e <- es]
+eqShow (EqSum es) = pm $ intercalate "+" [eqShow e | e <- es]
+        where pm ('+':'-':xs) = "-" ++ (pm xs)
+              pm (x:xs) = x:(pm xs)
+              pm x = x
+eqSubShow e@(EqTerm i) = eqShow e
+eqSubShow e@(EqExp {}) = eqShow e
+eqSubShow e@(EqNexp {}) = eqShow e
+eqSubShow e = "(" ++ (eqShow e) ++ ")"
+
+eqneg :: Equation -> Equation
+eqneg (EqTerm i) = EqTerm (-i)
+eqneg (EqExp{base=b,power=p}) = EqNexp {base=b,power=p}
+eqneg (EqNexp{base=b,power=p}) = EqExp {base=b,power=p}
+eqneg (EqProduct (e:es)) = EqProduct $ (eqneg e):es
+eqneg (EqDiv {numerator=n, denominator=d}) = EqDiv {numerator=(eqneg n),denominator=d}
+eqneg (EqSum e) = EqSum [eqneg ee| ee <- e]
+
+eqnegtest (EqTerm i) = i<0
+eqnegtest (EqNexp{}) = True
+eqnegtest (EqProduct (e:es)) = eqnegtest e
+eqnegtest (EqDiv {numerator=n}) = eqnegtest n
+eqnegtest e = False
+
+eqadd (EqSum e1) (EqSum e2) = EqSum (e1++e2)
+eqadd (EqSum e1) e2 = EqSum (e1++[e2])
+eqadd e1 (EqSum e2) = EqSum ([e1]++e2)
+eqadd e1 e2 = EqSum [e1,e2]
+
+eqdiv n d
+    | eqnegtest d = EqDiv { numerator=(eqneg n), denominator=(eqneg d) }
+    | otherwise = EqDiv { numerator=n, denominator=d }
+
+eqexp b p = EqExp { base=b, power=p }
+
+eqmult e1@(EqProduct es1) e2@(EqProduct es2)
+    | eqnegtest e2 = eqmult (eqneg e1) (eqneg e2)
+    | otherwise = EqProduct $ es1++es2
+eqmult e1@(EqProduct es1) e2
+    | eqnegtest e2 = eqmult (eqneg e1) (eqneg e2)
+    | otherwise = EqProduct $ es1++[e2]
+eqmult e1 e2@(EqProduct es2)
+    | eqnegtest e2 = eqmult (eqneg e1) (eqneg e2)
+    | otherwise = EqProduct $ [e1]++es2
+eqmult e1 e2
+    | eqnegtest e2 = EqProduct [eqneg e1,eqneg e2]
+    | otherwise = EqProduct [e1,e2]
+
+
 -- | Expression type holds intermediate and final equation information
 -- includes value and String explaining calculation to date
 -- Also has Invalid type for redundant expressions or divide-by-zero
 data Expression =
-            Invalid String | -- String is explanation
-            Single { value :: Integer
-            , operators :: Integer
-            , literal :: String
+            Invalid Equation | -- String is explanation
+            Single { value :: Int
+            , operators :: Int
+--            , equation :: String
+            , equation :: Equation
             }| -- equation and result of calculation: value, ops, equation_text
             Pair Expression Expression  -- pair of expressions ready for binary operation
             deriving(Show)
@@ -90,27 +156,30 @@ data Expression =
 pair_up :: [String] -> [Expression]
 -- ^
 pair_up xs = case len of
-    0 -> [Invalid "No input"]
-    1 -> [Single {value=(read x1::Integer), operators=0, literal=x1} ] -- Also interpret literal to numeric
+    0 -> [Invalid EqNull]
+    1 -> [Single {value=i, operators=0, equation=(EqTerm i)} ] -- Also interpret equation to numeric
     _ -> [Pair f s | w<-[ (pair_up $ fst u, pair_up $ snd u) | u <- [ splitAt n xs | n <- [ 1 .. (len-1) ] ] ], f<-fst w, s <-snd w]
     where len = length xs
-          (x1:xx) = xs 
+          (x1:xx) = xs
+          i = read x1 :: Int 
+
+showSingle (Single { value=i, operators=o, equation=e }) = "Value= " ++ (show i) ++ " |ops= " ++ (show o) ++ " | eqn= "++ (eqShow e)
 
 -- | operator lists, unary and binary
 -- minus removed since x-y == x+(-y) so would be double counted
 -- Exponentiation 
 unaryList = [
-    UnaryOp "_" (\x->Just (x) )
-    ,UnaryOp "(-_)" (\x->Just (-x) )
+    UnaryOp id (\x->Just (x) )
+    ,UnaryOp eqneg (\x->Just (-x) )
 --    ,UnaryOp "_!" (\x-> if (x<0) || (x>10) then Nothing else Just (factorial x) )
     ]
 
 binaryList = [
-    BinaryOp "(_+_)" (\x y->Just (x+y) )
+    BinaryOp eqadd (\x y->Just (x+y) )
 --    ,BinaryOp "(_-_)" (\x y->if y<0 then Nothing else Just (x-y) )
-    ,BinaryOp "(_*_)" (\x y->Just (x*y) )
-    ,BinaryOp "(_/_)" (\x y->if (y==0) || ((mod x y)/=0) then Nothing else Just (div x y) )
-    ,BinaryOp "(_^_)" (\x y->if (y<=0) || (x<0) then Nothing else Just (x^y) )
+    ,BinaryOp eqmult (\x y->Just (x*y) )
+    ,BinaryOp eqdiv (\x y->if (y==0) || ((mod x y)/=0) then Nothing else Just (div x y) )
+    ,BinaryOp eqexp (\x y->if (y<=0) || (x<0) then Nothing else Just (x^y) )
 --    ,BinaryOp "(_ mod _)" (\x y->if (y<1) then Nothing else Just (mod x y) )
     ]
 
@@ -119,10 +188,10 @@ binaryList = [
 unary_calc :: Expression -> Operation -> Expression
 -- ^
 unary_calc (Invalid s) _ = Invalid s
-unary_calc single@(Single {value=i1, operators=o1, literal=s1}) (UnaryOp s f) = case c of
+unary_calc single@(Single {value=i1, operators=o1, equation=s1}) (UnaryOp eqf f) = case c of
     Nothing -> Invalid sout
-    Just(i) -> single { value=i, literal=sout} 
-    where sout = sub_str s s1
+    Just(i) -> single { value=i, equation=sout} 
+    where sout = eqf s1
           c =  f i1
 -- | binary_calc apply an operation to a pair of values
 -- Two Singletons and Op to calculated Single
@@ -130,10 +199,10 @@ binary_calc :: Expression -> Expression -> Operation -> Expression
 -- ^
 binary_calc (Invalid s) _ _ = Invalid s
 binary_calc _ (Invalid s) _ = Invalid s
-binary_calc (Single {value=i1, operators=o1, literal=s1}) (Single {value=i2, operators=o2, literal=s2}) (BinaryOp s f) = case c of
+binary_calc (Single {value=i1, operators=o1, equation=s1}) (Single {value=i2, operators=o2, equation=s2}) (BinaryOp eqf f) = case c of
     Nothing -> Invalid sout
-    Just(i) -> Single { value=i, operators=o1+o2+1, literal=sout}
-    where sout = sub_str (sub_str s s1) s2
+    Just(i) -> Single { value=i, operators=o1+o2+1, equation=sout}
+    where sout = eqf s1 s2
           c =  f i1 i2
 
 -- | unary_multicalc Apply all unitary ops
@@ -160,7 +229,7 @@ total_calc :: [Expression] -> [Expression]
 total_calc es = foldr1 (++) [ binary_multicalc e | e <- es ]
 
 -- | orderedPairs and unorderedPairs -- create the list of possible equations from a year 
--- literal number -> digits -> (-> optional permutations) -> combinations of digits -> All binary pairs in an Expression
+-- equation number -> digits -> (-> optional permutations) -> combinations of digits -> All binary pairs in an Expression
 orderedPairs :: String -> [Expression]
 unorderedPairs :: String -> [Expression]
 -- ^
@@ -188,29 +257,6 @@ bestcalc e@(e1@(Single {value=i1}):e2@(Single {value=i2}):es)
     | i1==i2 = bestcalc (e1:es)
     | otherwise = (e1:(bestcalc (e2:es)))
 
-split_chars _ [] = []
-split_chars c x
-    | b == "" = [a]
-    | a == "" = [[b']] ++ (split_chars c bs)
-    | otherwise = [a,[b']] ++ (split_chars c bs) 
-    where (a,b) = break (\q->elem q c) x
-          (b':bs) = b
-
-eparse x = split_chars "*()-+/^" $ filter (' '/=) x
-
-simplify [] = []
-simplify ("+":"-":ds) = ("-":(simplify ds))
-simplify ("(":b:")":ds) = (b:(simplify ds))
-simplify ("(":"-":b:")":ds) = ("-":b:(simplify ds))
-simplify (x:xs) = x:(simplify xs)
-
-resimple x
-    | (length x) == (length sx) = x
-    | otherwise = resimple sx
-    where sx = simplify x
-
-simple x = resimple x
-
 -- | Year Digits problem -- make as many of the numbers between 1 and 100 using the digits of the current year
 -- solve the problem
 main :: IO ()
@@ -224,9 +270,9 @@ main = do
                  $ sortBy compareSingle
                  $ filter goodcalc
                  $ total_calc
-                 $ orderedPairs year 
-  mapM_ putStrLn $ map show solution1
-  mapM_ putStrLn $ [ concat $ simple $ eparse $ literal s | s <- solution1 ]
+                 $ orderedPairs year
+  putStrLn $ "  Total covered = " ++ (show $ length solution1)
+  mapM_ putStrLn $ map showSingle solution1
 
   putStrLn "Unordered solution:"
   let solution2 = bestcalc
@@ -234,5 +280,5 @@ main = do
                  $ filter goodcalc
                  $ total_calc
                  $ unorderedPairs year 
-  mapM_ putStrLn $ map show solution2
-  mapM_ putStrLn $ [ concat $ simple $ eparse $ literal s | s <- solution2 ]
+  putStrLn $ "  Total covered = " ++ (show $ length solution2)
+  mapM_ putStrLn $ map showSingle solution2
