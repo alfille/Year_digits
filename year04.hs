@@ -65,8 +65,8 @@ makeSolutionList year = bestcalc $ sortBy compareSingle rawConcat
 
 -- | Operation type holds information on unitary and binary operations
 data Operation =
-        UnaryOp (Equation->Equation) (Int -> Maybe Int) |
-        BinaryOp (Equation->Equation->Equation) (Int -> Int -> Maybe Int)
+        UnaryOp (Equation->Equation) (Integer -> Maybe Integer) |
+        BinaryOp (Equation->Equation->Equation) (Integer -> Integer -> Maybe Integer)
 -- ^
 
 {-
@@ -80,7 +80,7 @@ factorial n
 -- ^
 data Equation =
         EqNull
-        | EqTerm Int
+        | EqTerm Integer
         | EqFactorial Equation
         | EqSum [Equation]
         | EqProduct [Equation]
@@ -161,7 +161,7 @@ eqfact e = EqFactorial e
 -- Also has Invalid type for redundant expressions or divide-by-zero
 data Expression =
             Invalid Equation | -- String is explanation
-            Single { value :: Int
+            Single { value :: Integer
             , operators :: Int
             , equation :: Equation
             , outorder :: Bool
@@ -185,7 +185,7 @@ pair_up xs = case len of
     _ -> [Pair f s | w<-[ (pair_up $ fst u, pair_up $ snd u) | u <- [ splitAt n xs | n <- [ 1 .. (len-1) ] ] ], f<-fst w, s <-snd w]
     where len = length xs
           (x1:xx) = xs
-          i = read x1 :: Int 
+          i = read x1 :: Integer 
 
 -- | operator lists, unary and binary
 -- minus removed since x-y == x+(-y) so would be double counted
@@ -196,11 +196,17 @@ unaryList = [
 --    ,UnaryOp eqfact (\x-> if (x<3) || (x>9) then Nothing else Just (factorial x) )
     ]
 
+logMax = (log $ fromIntegral (maxBound::Int)) /4
+
 binaryList = [
     BinaryOp eqadd (\x y->Just (x+y) )
     ,BinaryOp eqmult (\x y->Just (x*y) )
     ,BinaryOp eqdiv (\x y->if (y==0) || ((mod x y)/=0) then Nothing else Just (div x y) )
-    ,BinaryOp eqexp (\x y->if (y<0) || (x<0) then Nothing else if (x==0) && (y==0) then Nothing else Just (x^y) )
+    ,BinaryOp eqexp (\x y->
+        if (y<0) || (x<0)   then Nothing else
+        if (x==0) && (y==0) then Nothing else
+        if (x==1) || (y<15) then Just(x^y) else
+        Nothing )
 --    ,BinaryOp "(_ mod _)" (\x y->if (y<1) then Nothing else Just (mod x y) )
     ]
 
@@ -254,9 +260,19 @@ total_calc es = foldr1 (++) [ binary_multicalc e | e <- es ]
 main :: IO ()
 -- ^
 main = do
+  putStrLn "Find equations for 1 to 100 using a year's digits"
   putStrLn "Enter the year:"
   year <- getLine
   let solution = makeSolutionList year
 
   putStrLn $ "  Total covered = " ++ (show $ length solution)
   mapM_ putStrLn $ map show $ solution
+
+range = do
+  putStrLn "Show how many numbers from 1 to 100 can be found for each year in range"
+  putStrLn "Enter the starting year:"
+  year1 <- getLine
+  putStrLn "Enter the finishing year:"
+  year2 <- getLine
+  mapM_ putStrLn $ [ (show y) ++ ", " ++ (show $ length $ makeSolutionList $ show y) | y <- [(read year1 :: Int) .. (read year2 :: Int)] ]
+  
