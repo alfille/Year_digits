@@ -18,18 +18,59 @@ paul.alfille@gmail.com
 
 MIT License
 
+[Year_digits](https://github.com/alfille/Year_digits)
+
 # Inspiration
 This problem appears as a yearly proposal in [MIT's Technology Review](https://www.technologyreview.com/2004/03/01/40269/puzzle-corner-12/)
 
 >Y2004. How many integers from 1 to 100 can you form using the digits 2, 0, 0, and 4 exactly once each and the operators +, -, x (multiplication), / (division), and exponentiation? We desire solutions containing the minimum number of operators; and among solutions having a given number of operators, those using the digits in the order 2, 0, 0, and 4 are preferred. Parentheses may be used for grouping; they do not count as operators. A leading minus sign does count as an operator.
 
 # Project
-## Format
-Our approach will be an exhaustive search of the possible equations. Some versions with progressive optimizations will be added.
-
 ## Platform
-Haskell, a pure functional language will be used. Since I'm new to the language, elegance will hopefully come in later versions.
+Haskell functional language.
 
+
+## Format
+Our approach will be an exhaustive search of the possible equations. 
+
+### Valid calculations
+* Division by zero excluded. 
+* Exponentiation only with zero or positive exponents and zero or positive base, with 0^0 excluded.
+*Rationale: negative base is captured by negating the full exponential term, and negative powers are covered by division.*
+* Division only with no remainder.
+
+### Operators
+#### unitary
+* Each term is duplicated "negated." 
+* *A potential unitary operator !=factorial would be an interesting enhancement.*
+#### binary
+* Multiplication (*) 
+* Division (/)
+* Addition (+)
+* Exponentiation (^)
+* *Note that subtraction is already implicitly included with negation and addition i.e. +-*
+ 
+## Representation
+### Initial approach:
+Text substitution of the term. i.e.
+"x^y" with x and y terms substituted in string
+
+Unfortunately, the resulting equations were ugly. A text parser and simplifier was a possible solution, but a more elegant solution is seen in later versions.
+
+### Current approach, the "**Equation**" type class
+Elements:
+* EqTerm -- a number possibly negative
+* EqExponent -- Equation ^ Equation
+* EqDivision -- Equation / Equation
+* EqSum -- A list of Equations to be summed
+* EqProduct -- A list of Equations to be multiplied
+
+Note that by construction, EqSum cannot have EqSums as terms.
+ 
+Note that by construction, EqProduct cannot have EqProducts as terms.
+
+Negatives are handled by keeping them as the first term of a product and numerator of a division.
+ 
 ## Steps
 * Separate digits of year.
 * Permute digits (optional for out-of-order)
@@ -39,8 +80,75 @@ Haskell, a pure functional language will be used. Since I'm new to the language,
 * Each term can also be negated (i.e. 2, -2)
 * Sort by criteria
 
+# Usage
+Easiest:
+* Install [Haskell](https://www.haskell.org/)
+* Go to project directory (or move file year04.hs to current directory)
+* Start `ghci` command interface
+* `:l year04.hs`
+* Try any of the choices:
+  * `main`
+  * `range`
+  * `rangeplot`
+* Example results below.
+
 # Results
 ## Main -- For a specific year
+
+```
+ghci> main
+Find equations for 1 to 100 using a year's digits
+Enter the year:
+2023
+  Total covered = 47
+value= 1 |ops= 1 |order= False | eqn= 223^0
+value= 2 |ops= 2 |order= True | eqn= 2+0*23
+value= 3 |ops= 1 |order= True | eqn= -20+23
+value= 4 |ops= 2 |order= True | eqn= 20/(2+3)
+value= 5 |ops= 3 |order= True | eqn= 2+0*2+3
+value= 6 |ops= 2 |order= True | eqn= (20-2)/3
+value= 7 |ops= 2 |order= True | eqn= 20/2-3
+value= 8 |ops= 1 |order= False | eqn= -22+30
+value= 9 |ops= 3 |order= True | eqn= 2^0+2^3
+value= 10 |ops= 3 |order= True | eqn= 2*(0+2+3)
+value= 11 |ops= 2 |order= False | eqn= 20-3^2
+value= 12 |ops= 1 |order= False | eqn= -20+32
+value= 13 |ops= 2 |order= True | eqn= 20/2+3
+value= 14 |ops= 2 |order= True | eqn= 20-2*3
+value= 15 |ops= 2 |order= True | eqn= 20-2-3
+value= 16 |ops= 2 |order= False | eqn= 0+32/2
+value= 17 |ops= 2 |order= False | eqn= 2+30/2
+value= 18 |ops= 3 |order= False | eqn= 0+2*3^2
+value= 19 |ops= 2 |order= True | eqn= 20+2-3
+value= 20 |ops= 2 |order= True | eqn= -20*(2-3)
+value= 21 |ops= 2 |order= True | eqn= 20-2+3
+value= 22 |ops= 2 |order= True | eqn= -2^0+23
+value= 23 |ops= 2 |order= True | eqn= 2*0+23
+value= 24 |ops= 2 |order= True | eqn= 2^0+23
+value= 25 |ops= 2 |order= True | eqn= 20+2+3
+value= 26 |ops= 2 |order= True | eqn= 20+2*3
+value= 27 |ops= 3 |order= True | eqn= (2^0+2)^3
+value= 28 |ops= 2 |order= True | eqn= 20+2^3
+value= 29 |ops= 2 |order= False | eqn= 20+3^2
+value= 30 |ops= 2 |order= True | eqn= (20/2)*3
+value= 31 |ops= 2 |order= False | eqn= -2^0+32
+value= 32 |ops= 2 |order= False | eqn= 0*2+32
+value= 33 |ops= 2 |order= False | eqn= 2^0+32
+value= 34 |ops= 2 |order= False | eqn= 0+2+32
+value= 36 |ops= 3 |order= False | eqn= 0+(2*3)^2
+value= 37 |ops= 2 |order= True | eqn= 20*2-3
+value= 43 |ops= 1 |order= True | eqn= 20+23
+value= 46 |ops= 2 |order= True | eqn= 2*(0+23)
+value= 52 |ops= 1 |order= False | eqn= 20+32
+value= 54 |ops= 2 |order= True | eqn= (20-2)*3
+value= 56 |ops= 2 |order= False | eqn= -2*(2-30)
+value= 58 |ops= 2 |order= False | eqn= 20*3-2
+value= 62 |ops= 2 |order= False | eqn= 20*3+2
+value= 64 |ops= 2 |order= False | eqn= 0+2*32
+value= 66 |ops= 2 |order= True | eqn= (20+2)*3
+value= 81 |ops= 3 |order= False | eqn= 0+3^(2+2)
+value= 100 |ops= 2 |order= True | eqn= 20*(2+3)
+```
 ## range -- number of numbers covered for a range of years
 
 ![number of numbers covered for each century](range over centuries.png)
