@@ -40,6 +40,12 @@ Haskell, a pure functional language will be used. Since I'm new to the language,
 * Sort by criteria
 
 # Results
+## Main -- For a specific year
+## range -- number of numbers covered for a range of years
+
+![number of numbers covered for each century](range over centuries.png)
+
+## rangeplot -- pattern of coverage for a range of years
 ```
 1800 ++----+++++------+---------------------------------------------------+--------+++--------+-+--------
 1801 ++++-+++++++---++++--------+-----------+-----------------------+----++++-----+++++-----+-++-+-------
