@@ -151,7 +151,7 @@ value= 100 |ops= 2 |order= True | eqn= 20*(2+3)
 ```
 ## range -- number of numbers covered for a range of years
 
-![plots](https://github.com/alfille/Year_digits/range\ over\ centuries.png)
+![plots](https://github.com/alfille/Year_digits/range_over_centuries.png)
 
 ## rangeplot -- pattern of coverage for a range of years
 ```
