@@ -48,7 +48,7 @@ cperm xs =
 makeSolutionList :: String -> [Expression]
 -- ^
 makeSolutionList year = bestcalc $ sortBy compareSingle rawConcat
-    where rawSolve = fmap ((filter goodcalc) . total_calc . (foldr1 (++)) . (fmap pair_up) ) $ makeRawLists year
+    where rawSolve = ((filter goodcalc) . total_calc . (foldr1 (++)) . (fmap pair_up) ) <$> makeRawLists year
           rawConcat = [ s{ outorder = False } | s <- (rawSolve!!0) ] ++ (rawSolve!!1)
           compareSingle s1 s2 = compare (value s1, operators s1, outorder s1) (value s2, operators s2, outorder s2)
           -- filter out Invalids and values out of range
@@ -171,7 +171,7 @@ data Expression =
 
 instance Show (Expression) where
     show (Invalid e) = "Invalid | eqn= " ++ (show e)
-    show (Single { value=i, operators=o, equation=e, outorder=r }) = "Value= " ++ (show i) ++ " |ops= " ++ (show o) ++ " |order= " ++ (show $ not r) ++ " | eqn= " ++ (show e)
+    show (Single { value=i, operators=o, equation=e, outorder=r }) = "value= " ++ (show i) ++ " |ops= " ++ (show o) ++ " |order= " ++ (show $ not r) ++ " | eqn= " ++ (show e)
     show (Pair e1 e2) = show (e1,e2)
 
 -- | pair_up creates all possible pairs of a list (for binary operators)
@@ -268,6 +268,10 @@ main = do
   putStrLn $ "  Total covered = " ++ (show $ length solution)
   mapM_ putStrLn $ map show $ solution
 
+-- | Year Digits -- range
+-- show the number calculable (up to the full 100) for each year in the inclusive range
+range :: IO ()
+-- ^
 range = do
   putStrLn "Show how many numbers from 1 to 100 can be found for each year in range"
   putStrLn "Enter the starting year:"
@@ -275,4 +279,26 @@ range = do
   putStrLn "Enter the finishing year:"
   year2 <- getLine
   mapM_ putStrLn $ [ (show y) ++ ", " ++ (show $ length $ makeSolutionList $ show y) | y <- [(read year1 :: Int) .. (read year2 :: Int)] ]
-  
+
+calculable :: Integer -> [Expression] -> Bool
+calculable _ [] = False
+calculable n (e:es) = case (compare n $ value e) of
+    GT -> calculable n es
+    EQ -> True
+    LT -> False
+
+calcString es = [ if calculable n es then '+' else '-' | n <- [1 .. 100] ]
+
+-- | Year Digits -- rangeplot
+-- show the numbers calcable for the range of years
+-- - no, + yes 1 .. 100
+rangeplot :: IO ()
+-- ^
+rangeplot = do
+  putStrLn "Show how many numbers from 1 to 100 can be found for each year in range"
+  putStrLn "Enter the starting year:"
+  year1 <- getLine
+  putStrLn "Enter the finishing year:"
+  year2 <- getLine
+  mapM_ putStrLn $ [ (show y) ++ " " ++ (calcString $ makeSolutionList $ show y) | y <- [(read year1 :: Integer) .. (read year2 :: Integer)] ]
+
